@@ -21,34 +21,6 @@ mcp = FastMCP("Sched-Agent MCP Server")
 
 
 @mcp.tool()
-def add(a: int, b: int) -> int:
-    """두 수를 더합니다.
-
-    Args:
-        a: 첫 번째 정수
-        b: 두 번째 정수
-
-    Returns:
-        두 수의 합
-    """
-    return a + b
-
-
-@mcp.tool()
-def get_agent_status() -> Dict[str, Any]:
-    """에이전트의 현재 상태를 반환합니다.
-
-    Returns:
-        에이전트 상태 정보를 담은 딕셔너리
-    """
-    return {
-        "status": "running",
-        "version": "0.1.0",
-        "model": "gpt-3.5-turbo"
-    }
-
-
-@mcp.tool()
 def search_langgraph_docs(query: str) -> List[Dict[str, Any]]:
     """LangGraph 공식 문서와 GitHub 저장소를 검색합니다.
 
