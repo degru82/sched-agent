@@ -30,8 +30,6 @@ def get_openai_client() -> ChatOpenAI:
 async def ask_agent(messages: list[dict]):
     """Main entrypoint for the LangGraph OpenAI + Calendar MCP agent demo."""
 
-    user_message = messages[-1]["content"]
-
     async with MultiServerMCPClient(
         {
             "google-calendar": {
@@ -47,7 +45,7 @@ async def ask_agent(messages: list[dict]):
             client.get_tools()
         )
         calendar_response = await agent.ainvoke(
-            {"messages": [{"role": "user", "content": user_message}]}
+            {"messages": messages}
         )
         # print(calendar_response)
     return calendar_response
