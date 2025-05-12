@@ -1,145 +1,63 @@
-"""LangGraph 기반 에이전트 구현.
-
-이 모듈은 LangGraph를 사용하여 LLM 에이전트를 구현합니다.
 """
-from typing import Any, Dict, List, TypedDict, Annotated, Sequence
+LangGraph Functional API 기반 OpenAI + Calendar MCP 연동 에이전트
+"""
+
 import os
+import asyncio
+from typing import Any
 from dotenv import load_dotenv
-
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.tools import BaseTool
-from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolExecutor
-from fastmcp import MCPClient
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langgraph.prebuilt import create_react_agent
 
-# Load environment variables
-load_dotenv()
 
-class AgentState(TypedDict):
-    """에이전트의 상태를 나타내는 타입."""
-    messages: Annotated[Sequence[HumanMessage | AIMessage], "대화 메시지"]
-    next: Annotated[str, "다음 단계"]
+def get_openai_client() -> ChatOpenAI:
+    """Load OpenAI API key from environment and return a ChatOpenAI client.
 
-class Agent:
-    """LangGraph 기반 LLM 에이전트."""
+    Returns:
+        ChatOpenAI: An instance of the OpenAI chat client.
 
-    def __init__(self, model_name: str = "gpt-3.5-turbo") -> None:
-        """에이전트 초기화.
+    Raises:
+        RuntimeError: If OPENAI_API_KEY is not set in the environment.
+    """
+    load_dotenv()
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set in the environment.")
+    return ChatOpenAI(model="gpt-4o", api_key=api_key)
 
-        Args:
-            model_name: 사용할 LLM 모델 이름
-        """
-        self.llm = ChatOpenAI(
-            model=model_name,
-            temperature=0,
-            api_key=os.getenv("OPENAI_API_KEY")
-        )
-        
-        # Initialize MCP client
-        self.mcp_client = MCPClient("http://localhost:8000")
-        self.tools = self._get_mcp_tools()
-        self.tool_executor = ToolExecutor(self.tools)
-        
-        # Build the graph
-        self.graph = self._build_graph()
 
-    def _get_mcp_tools(self) -> List[BaseTool]:
-        """MCP 서버에서 사용 가능한 도구들을 가져옵니다.
+async def ask_agent(messages: list[dict]):
+    """Main entrypoint for the LangGraph OpenAI + Calendar MCP agent demo."""
 
-        Returns:
-            MCP 도구 리스트
-        """
-        try:
-            return self.mcp_client.get_tools()
-        except Exception as e:
-            print(f"Warning: Failed to get MCP tools: {e}")
-            return []
+    user_message = messages[-1]["content"]
 
-    def _create_agent_prompt(self) -> ChatPromptTemplate:
-        """에이전트 프롬프트를 생성합니다.
-
-        Returns:
-            생성된 프롬프트 템플릿
-        """
-        return ChatPromptTemplate.from_messages([
-            ("system", """You are a helpful AI assistant that can use tools to answer questions.
-            Follow these steps:
-            1. Think about what you need to do
-            2. Use tools if necessary
-            3. Provide a clear and concise answer
-            
-            Available tools: {tools}
-            
-            Always think step by step and explain your reasoning."""),
-            MessagesPlaceholder(variable_name="messages"),
-        ])
-
-    def _build_graph(self) -> StateGraph:
-        """에이전트 그래프를 구축합니다.
-
-        Returns:
-            구성된 LangGraph 그래프
-        """
-        # Create the graph
-        workflow = StateGraph(AgentState)
-
-        # Define the nodes
-        def agent_node(state: AgentState) -> AgentState:
-            """에이전트 노드: LLM을 사용하여 응답을 생성합니다."""
-            messages = state["messages"]
-            prompt = self._create_agent_prompt()
-            
-            # Generate response
-            response = self.llm.invoke(
-                prompt.format_messages(
-                    messages=messages,
-                    tools=self.tools
-                )
-            )
-            
-            # Update state
-            return {
-                "messages": messages + [response],
-                "next": "end"
+    async with MultiServerMCPClient(
+        {
+            "google-calendar": {
+                "command": "node",
+                "args": ["/Users/sewookkim/Projects/google-calendar-mcp/build/index.js"],
+                "transport": "stdio",
             }
-
-        # Add nodes to the graph
-        workflow.add_node("agent", agent_node)
-        
-        # Set the entry point
-        workflow.set_entry_point("agent")
-        
-        # Add edges
-        workflow.add_edge("agent", END)
-        
-        # Compile the graph
-        return workflow.compile()
-
-    async def process(self, input_text: str) -> Dict[str, Any]:
-        """입력 텍스트를 처리합니다.
-
-        Args:
-            input_text: 처리할 입력 텍스트
-
-        Returns:
-            처리 결과를 담은 딕셔너리
-        """
-        # Initialize state
-        initial_state = {
-            "messages": [HumanMessage(content=input_text)],
-            "next": "agent"
         }
-        
-        # Run the graph
-        result = await self.graph.ainvoke(initial_state)
-        
-        # Extract the final response
-        final_message = result["messages"][-1]
-        
-        return {
-            "input": input_text,
-            "output": final_message.content,
-            "status": "success"
-        } 
+    ) as client:
+        openai_client = get_openai_client()
+        agent = create_react_agent(
+            openai_client,
+            client.get_tools()
+        )
+        calendar_response = await agent.ainvoke(
+            {"messages": [{"role": "user", "content": user_message}]}
+        )
+        # print(calendar_response)
+    return calendar_response
+
+
+if __name__ == "__main__":
+
+    messages = [{"role": "user", "content": "이번 주 내 일정 알려줘"}]
+    response = asyncio.run(
+        ask_agent(messages)
+    )
+    print(response)
+

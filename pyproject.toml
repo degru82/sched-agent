@@ -14,6 +14,9 @@ dependencies = [
     "streamlit",
     "tavily-python>=0.7.2",
     "dotenv>=0.9.9",
+    "langchain-openai>=0.3.16",
+    "python-dotenv>=1.1.0",
+    "langchain-mcp-adapters>=0.0.11",
 ]
 
 [build-system]
@@ -39,3 +42,8 @@ line-ending = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --cov=app" 
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+]
