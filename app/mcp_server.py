@@ -17,7 +17,7 @@ load_dotenv()
 tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 
 # FastMCP 서버 인스턴스 생성
-mcp = FastMCP("Sched-Agent MCP Server")
+mcp = FastMCP("LangGraph and FastMCP Official Document Search Server")
 
 
 @mcp.tool()
