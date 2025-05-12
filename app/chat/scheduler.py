@@ -17,10 +17,9 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
 
 
-def ask_to_agent(user_messages: List[dict]) -> Any:
+def ask_scheduler(user_messages: List[dict]) -> Any:
     """Create and return a LangGraph agent instance."""
     load_dotenv()
-
     return ask_agent(user_messages)
 
 
@@ -71,7 +70,7 @@ def main() -> None:
                 logging.info(f"chat_history: {st.session_state.chat_history}")
                 logging.info(f"chat_history type: {type(st.session_state.chat_history)}")
                 response = asyncio.run(
-                    ask_to_agent(
+                    ask_scheduler(
                         list(st.session_state.chat_history)
                     )
                 )
